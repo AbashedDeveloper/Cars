@@ -1,5 +1,5 @@
 # Import all necessary modules
-import tensorflow
+import tensorflow as tf
 import keras
 
 from keras.models import Sequential
@@ -20,48 +20,71 @@ y = dataset.iloc[:, 15].values
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder
 from sklearn.preprocessing.imputation import Imputer
 
-label_encoder_make = LabelEncoder()
-X[:, 0] = label_encoder_make.fit_transform(X[:, 0])
+labelencode_array = [0, 2, 5, 6, 8, 9]
 
-label_encoder_engineType = LabelEncoder()
-X[:, 2] = label_encoder_engineType.fit_transform(X[:, 2].astype(str))
+for i in labelencode_array:
+    labelencoder = LabelEncoder()
+    X[:, i] = labelencoder.fit_transform(X[:, i].astype(str))
 
-label_encoder_transmission = LabelEncoder()
-X[:, 5] = label_encoder_transmission.fit_transform(X[:, 5])
-
-label_encoder_wheels = LabelEncoder()
-X[:, 6] = label_encoder_wheels.fit_transform(X[:, 6].astype(str))
-
-label_encoder_size = LabelEncoder()
-X[:, 8] = label_encoder_size.fit_transform(X[:, 8])
-
-label_encoder_style = LabelEncoder()
-X[:, 9] = label_encoder_style.fit_transform(X[:, 9])
 
 imp = Imputer(missing_values=np.nan, strategy='mean')
 X = imp.fit_transform(X)
 
 # one-hot encode
-onehotencoder_make = OneHotEncoder(categorical_features=[0])
-X = onehotencoder_make.fit_transform(X).toarray()
-X = X[:, 1:]
 
-onehotencoder_engine = OneHotEncoder(categorical_features=[48])
-X = onehotencoder_engine.fit_transform(X).toarray()
-X = X[:, 1:]
+onehotencode_array = [0, 48, 60, 64, 69, 83]
 
-onehotencoder_transmission = OneHotEncoder(categorical_features=[60])
-X = onehotencoder_transmission.fit_transform(X).toarray()
-X = X[:, 1:]
+for i in onehotencode_array:
+    onehotencoder_make = OneHotEncoder(categorical_features=[i])
+    X = onehotencoder_make.fit_transform(X).toarray()
+    X = X[:, 1:]
+    
+# Split the dataset into the Training set and Test set
+    
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2, random_state = 0)
 
-onehotencoder_wheels = OneHotEncoder(categorical_features=[64])
-X = onehotencoder_wheels.fit_transform(X).toarray()
-X = X[:, 1:]
+# Feature Scaling
+from sklearn.preprocessing import StandardScaler
+sc = StandardScaler()
+X_train = sc.fit_transform(X_train)
+X_test = sc.transform(X_test)
 
-onehotencoder_size = OneHotEncoder(categorical_features=[69])
-X = onehotencoder_size.fit_transform(X).toarray()
-X = X[:, 1:]
+model = Sequential()
+model.add(Dense(64, activation='relu', input_shape=(X_train.shape[1],)))
+model.add(Dense(64, activation='relu',))
+model.add(Dense(1))
 
-onehotencoder_style = OneHotEncoder(categorical_features=[83])
-X = onehotencoder_style.fit_transform(X).toarray()
-X = X[:, 1:]
+optimizer = tf.train.RMSPropOptimizer(0.001)
+
+model.compile(optimizer=optimizer, loss='mse', metrics=['accuracy'])
+
+# Display training progress by printing a single dot for each completed epoch.
+class PrintDot(keras.callbacks.Callback):
+  def on_epoch_end(self,epoch,logs):
+    if epoch % 100 == 0: print('')
+    print((epoch), end='\n')
+
+EPOCHS = 10000
+
+# Store training stats
+history = model.fit(X_train, y_train, epochs=EPOCHS,
+                    validation_split=0.2, verbose=0,
+                    callbacks=[PrintDot()])
+
+model_answer = model.predict(X_test)
+print("\n")
+
+correct = 0
+incorrect = 0
+
+for i in range(1, len(model_answer)):
+    lower_bound = 0.9 * y_test[i]
+    upper_bound = 1.15 * y_test[i]
+    
+    if ((model_answer[i] > lower_bound) and (model_answer[i] < upper_bound)):
+        correct += 1
+    else:
+        incorrect += 1
+        
+print("The model got", correct, "right, and", incorrect, "wrong")
